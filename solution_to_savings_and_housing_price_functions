@@ -1,0 +1,177 @@
+
+! This subroutine solves the savings and price functions. It starts with the savings functions, which does not depend
+! on the price of housing, and then using the savings function, it solves for the housing price.	
+subroutine solve_savings_and_price_functions
+
+	distance=1
+
+	!Now, solving for the eqm in the incomplete information economy
+	do while (distance>stopping_rule_assets)
+    
+		do r=1,2 ! Loops over the income states
+        
+			do e=1,n_assets ! Loops over the asset levels
+            
+				do phh=1,n_beliefs ! Loops over beliefs of staying in a good state when in a good state
+                
+					do pll=1,n_beliefs  ! Loops over beleifs of staying in a bad state when in a bad state
+               
+		               			do m=1,n_i ! Loops over interest rates
+            
+							! Gets the location in the asset grid that is closest to 
+							! a_prime_guess(r,e,phh,pll,m)
+							aprime=minloc(abs(assetsgrid),1,mask=abs(assetsgrid)>= &
+								a_prime_guess_imperfect(r,e,phh,pll,m)) 
+								                        
+							if (r==1) then
+
+								phhprime1=min(minloc(abs(pietildehhgrid),1,mask=abs(pietildehhgrid)>=&
+									(gamma+(1-gamma)*pietildehhgrid(phh))),n_beliefs)
+
+								phhprime2=min(minloc(abs(pietildehhgrid),1,mask=abs(pietildehhgrid)>=&
+									(1-gamma)*pietildehhgrid(phh)),n_beliefs)
+
+								J_1=(pietildehhgrid(phh))*(1/(y(r)+(1+real_return(m+1-myopia_int))* &
+									a_prime_guess_imperfect(r,e,phh,pll,m)- &
+			   					        a_prime_guess_imperfect(r,aprime,phhprime1,&
+									pll,min(n_i,m+1-myopia_int)))**(sigma_c))
+
+							    	J_2=(1-pietildehhgrid(phh))*(1/(y(r+1)+(1+real_return(m+1-myopia_int))* & 
+									a_prime_guess_imperfect(r,e,phh,pll,m)- &
+									a_prime_guess_imperfect(r+1,aprime,phhprime2,&
+									pll,min(n_i,m+1-myopia_int)))**(sigma_c))
+
+							else
+
+								pllprime1=min(minloc(abs(pietildellgrid),1,mask=abs(pietildellgrid)>=&
+									(gamma+(1-gamma)*pietildellgrid(pll))),n_beliefs)
+
+								pllprime2=min(minloc(abs(pietildellgrid),1,mask=abs(pietildellgrid)>=&
+									(1-gamma)*pietildellgrid(pll)),n_beliefs)
+								                        
+								J_1=(pietildellgrid(pll))*(1/(y(r)+(1+real_return(m+1-myopia_int))* &
+									a_prime_guess_imperfect(r,e,phh,pll,m)- &
+									a_prime_guess_imperfect(r,aprime,phh,pllprime1,&
+									min(n_i,m+1-myopia_int)))**(sigma_c))
+
+							    	J_2=(1-pietildellgrid(pll))*(1/(y(r-1)+(1+real_return(m+1-myopia_int))* &
+									a_prime_guess_imperfect(r,e,phh,pll,m)- &
+									a_prime_guess_imperfect(r-1,aprime,phh,pllprime2,&
+									min(n_i,m+1-myopia_int)))**(sigma_c))
+
+							end if
+            
+							J=(1/((J_1+J_2)*beta_imperfect*(1+real_return(m+1-myopia_int))))**(1/sigma_c)
+           
+							a_prime_imperfect(r,e,phh,pll,m)=min(max(y(r) + & 
+								(1+real_return(m))*assetsgrid(e) - J,assetsl),assetsu)
+
+						end do
+
+					end do
+
+				end do
+
+			end do
+            
+		end do
+
+    
+		distance=maxval(abs(a_prime_imperfect-a_prime_guess_imperfect))
+
+		print *, distance
+		print *, "hello 3"
+    
+		a_prime_guess_imperfect=lambda*(a_prime_imperfect)+(1-lambda)*(a_prime_guess_imperfect)
+        
+	end do
+
+	distance=1
+
+	do while (distance>stopping_rule_price) ! Loops until convergence of the price function
+    
+		do r=1,2 ! Loops over the income states
+       
+			do e=1,n_assets ! Loops over the assets levels
+				
+				do phh=1,n_beliefs ! Loops over beliefs of staying in a good state when in a good state
+                
+					do pll=1,n_beliefs  ! Loops over beleifs of staying in a bad state when in a bad state
+                                   
+						do m=1,n_i ! Loops over the interest rates
+           
+							! Gets the location in the asset grid that is closest to
+							! a_prime_guess(r,e,phh,pll,m)
+							aprime=minloc(abs(assetsgrid),1,mask=abs(assetsgrid)>= &
+								a_prime_guess_imperfect(r,e,phh,pll,m)) 
+
+							if (r==1) then
+
+								phhprime1=min(minloc(abs(pietildehhgrid),1,mask=abs(pietildehhgrid)>=&
+									(gamma+(1-gamma)*pietildehhgrid(phh))),n_beliefs)
+
+								phhprime2=min(minloc(abs(pietildehhgrid),1,mask=abs(pietildehhgrid)>=&
+									(1-gamma)*pietildehhgrid(phh)),n_beliefs)
+								                        
+								J_1=(pietildehhgrid(phh))*(price_guess_imperfect(r,aprime,phhprime1,&
+									pll,min(n_i,m+1-myopia_int))*(1/(y(r)+(1+&
+									real_return(m+1-myopia_int))*a_prime_imperfect(r,e,phh,pll,m)-&
+									a_prime_imperfect(r,aprime,phhprime1,pll,&
+									min(n_i,m+1-myopia_int)))**(sigma_c)))
+	
+								J_2=(1-pietildehhgrid(phh))*(price_guess_imperfect(r+1,aprime,phhprime2,&
+									pll,min(n_i,m+1-myopia_int))*(1/(y(r+1)+(1+&
+									real_return(m+1-myopia_int))*a_prime_imperfect(r,e,phh,pll,m)-&
+									a_prime_imperfect(r+1,aprime,phhprime2,pll,&
+									min(n_i,m+1-myopia_int)))**(sigma_c)))
+                        
+							else
+
+								pllprime1=min(minloc(abs(pietildellgrid),1,mask=abs(pietildellgrid)>=&
+									(gamma+(1-gamma)*pietildellgrid(pll))),n_beliefs)
+
+								pllprime2=min(minloc(abs(pietildellgrid),1,mask=abs(pietildellgrid)>=&
+									(1-gamma)*pietildellgrid(pll)),n_beliefs)                
+
+								J_1=(pietildellgrid(pll))*(price_guess_imperfect(r,aprime,phh,pllprime1,&
+									min(n_i,m+1-myopia_int))*(1/(y(r)+(1+&
+									real_return(m+1-myopia_int))*a_prime_imperfect(r,e,phh,pll,m)-&
+									a_prime_imperfect(r,aprime,phh,pllprime1,&
+									min(n_i,m+1-myopia_int)))**(sigma_c)))
+							    
+								J_2=(1-pietildellgrid(pll))*(price_guess_imperfect&
+									(r-1,aprime,phh,pllprime2,&
+									min(n_i,m+1-myopia_int))*(1/(y(r-1)+(1+&
+									real_return(m+1-myopia_int))*a_prime_imperfect(r,e,phh,pll,m)-&
+									a_prime_imperfect(r-1,aprime,phh,pllprime2,&
+									min(n_i,m+1-myopia_int)))**(sigma_c)))
+
+							end if
+        
+							J=beta_imperfect*(J_1+J_2+theta_imperfect/((H_imperfect)**(sigma_h)))
+           
+							price_imperfect(r,e,phh,pll,m)=J*(y(r)+(1+real_return(m))*assetsgrid(e)- &
+								a_prime_imperfect(r,e,phh,pll,m))**(sigma_c)
+                  
+						end do
+				
+					end do
+
+				end do
+
+			end do
+
+		end do
+            
+		distance=maxval(abs(price_imperfect-price_guess_imperfect))
+		
+		print *, distance
+		print *, "hello 4"
+    
+		price_guess_imperfect=lambda*(price_imperfect)+(1-lambda)*(price_guess_imperfect)
+        
+	end do
+
+end subroutine
+solving_savings_and_house_price_functions.txt
+Displaying solving_savings_and_house_price_functions.txt.
