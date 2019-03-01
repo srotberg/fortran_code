@@ -1,0 +1,175 @@
+
+! Solves the equilibrium for the government revenue maximization problem
+subroutine solve_monopoly_problem
+
+	! Checks if I solve the monopolist problem
+	if ((solve_equilibrium==1) .AND. (rev_max==1) .AND. (soc_max==0)) then
+
+		distance_delta_H_function=100000
+	
+		do while (distance_delta_H_function>stopping_rule_delta_H) ! Keeps looping as long as delta function has not converged
+
+			t=1
+	
+			do while (t<(last_release_prd+1)) 
+
+				if (t==1) then
+
+					H(t)=H_0+delta_H_guess(t)
+
+				else
+
+					H(t)=H(t-1)+delta_H_guess(t)
+
+				end if
+
+				! Gets the demand of each generation except the youngest
+				generation_i_h_demand(t,:)=matmul(generation_i_h_distribution(t,:),A_t_matrix(t,:,:))
+
+				! Gets the total demand of all generations excluding the youngest
+				total_demand_except_first_gen(t)=sum(generation_i_h_demand(t,:))
+	
+				! Gets the demand by the first generation
+				generation_i_h_demand(t,1)=a_t(t,1)*(H(t)-total_demand_except_first_gen(t))
+	
+				! Gets the distribution in period t+1
+				generation_i_h_distribution(t+1,:)=(/0.d0,generation_i_h_demand(t,1:(life_prds-1))/)
+	
+				! Gets the price factor
+				price_factor=(b(t)*inc(t)*pop(t))/(k(t)*(c*(1-a_t(t,life_prds-retire_prds+1))+b(t)))
+	
+				! Gets the price in period t
+				price(t)=price_factor*(1/(H(t)-total_demand_except_first_gen(t)))
+
+				inc_tax_to_GDP(t)=tau
+
+				price_times_delta_h_to_GDP(t)=(price(t)-cost(t))*delta_H_guess(t)/total_GDP(t)
+                    
+	                        G_to_GDP(t)=inc_tax_to_GDP(t)+price_times_delta_h_to_GDP(t)
+
+				t=t+1
+
+			end do
+                
+	                G_to_GDP(last_release_prd+1:economy_lifetime+1)=tau
+
+			H(last_release_prd+1:economy_lifetime+1)=H(last_release_prd)
+			delta_H_guess(last_release_prd+1:economy_lifetime+1)=0
+
+			t=1
+
+			dp_d_dist=0
+
+			do while (t<=last_release_prd)
+	
+				al=t
+
+				generation_i_h_distribution_al=generation_i_h_distribution
+		
+				H_al=H	
+
+				H_al(al)=H(al)+(H(al+1)-H(al))/2
+				multiplier=-1*(2/(H(al+1)-H(al))) !!! THIS IS A NEGATIVE NUMBER	
+
+				do while (al<=last_release_prd)		
+
+					! Gets the demand of each generation except the youngest
+					generation_i_h_demand_al(al,:)=matmul(generation_i_h_distribution_al(al,:),A_t_matrix(al,:,:))
+					
+					! Gets the total demand of all generations excluding the youngest
+					total_demand_except_first_gen_al(al)=sum(generation_i_h_demand_al(al,:))
+
+					! Gets the demand by the first generation
+					generation_i_h_demand_al(al,1)=a_t(al,1)*(H_al(al)-total_demand_except_first_gen_al(al))
+
+					! Gets the distribution in period t+1
+					generation_i_h_distribution_al(al+1,:)=(/0.d0,generation_i_h_demand_al(al,1:(life_prds-1))/)
+					
+					if (al>t) then
+                        
+                            			if (monopolist_has_subjective_discount_factor==1) then
+                            
+                                			! Gets the derivative of the price with respect to th distribution
+							dp_d_dist(t)=dp_d_dist(t)+monopolist_discount_factor(al)**(al-t)*price(al)**(2)*&
+								((k(al)*(c*(1-a_t(al,life_prds-retire_prds+1))+b(al)))/&
+								(b(al)*inc(al)*pop(al)))*multiplier*&
+								(((H_al(al)-total_demand_except_first_gen_al(al))-&
+								(H(al)-total_demand_except_first_gen(al))))*&
+								delta_h_guess(al)
+                            
+                        			else
+                            
+		                                	monopolist_NPV=1
+                            
+                            		    		do i=(t+1),al
+                                
+                                	    			monopolist_NPV=monopolist_NPV*(1+monopolist_discount_factor(i-1))
+                                    
+                                			end do
+                            
+                            		    		! Gets the derivative of the price with respect to th distribution
+							dp_d_dist(t)=dp_d_dist(t)+(1/monopolist_NPV)*price(al)**(2)*&
+								((k(al)*(c*(1-a_t(al,life_prds-retire_prds+1))+b(al)))/&
+								(b(al)*inc(al)*pop(al)))*multiplier*&
+								(((H_al(al)-total_demand_except_first_gen_al(al))-&
+								(H(al)-total_demand_except_first_gen(al))))*&
+								delta_h_guess(al)
+                            
+                            			end if                    
+					
+					end if
+	
+					al=al+1	
+
+				end do
+
+				t=t+1
+
+			end do
+
+			t=1
+
+			do while (t<=last_release_prd) 
+
+				dp_dH=-1*price(t)**(2)*((k(t)*(c*(1-a_t(t,life_prds-retire_prds+1))+b(t)))/(b(t)*inc(t)*pop(t)))
+
+				! Only considers land releases after 1961
+				if (land_1921_1961_as_given==1) then
+
+					if (t>data_starts+52*monopoly_from_2013) then
+	
+						delta_H(t)=max(0.d0,min((price(t)-cost(t)-(1/(1+monopolist_discount_factor(t)))*&
+							(price(t+1)-cost(t+1))+dp_d_dist(t))/(-1*dp_dH),L-H(t-1)))
+													
+	
+					end if       
+                
+				end if
+	
+				t=t+1
+
+			end do
+
+			t=1
+
+			distance_delta_H_function=maxval(abs(delta_H-delta_H_guess))
+
+			delta_H_guess=(1-gamma)*delta_H+gamma*delta_H_guess
+
+			generation_i_h_distribution(t,:)=initial_h_distribution
+
+			write(*,*) "distance=", distance_delta_H_function
+                
+                	call calculating_govt_spending_NPV()
+                
+		end do
+            
+            call calculating_govt_spending_NPV()
+            
+            call calculate_welfare()
+
+	end if
+
+end subroutine
+monopolist_problem.txt
+Displaying monopolist_problem.txt.
