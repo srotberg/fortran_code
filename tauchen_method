@@ -1,0 +1,87 @@
+
+! This subroutine uses the Tauchen method to get the probabilities of a child having different investment skills depending on their parents
+
+subroutine tauchen_method	
+	        
+	! Sets the sd of ability
+        sd_log_productivity=sd_epsilon_log_productivity/sqrt(1-(persistency_log_productivity)**2)
+        
+        ! Sets the lower and upper bounds of the productivity cutoffs
+        log_productivity_lower_bound=-log_productivity_deviation*sd_log_productivity
+        log_productivity_upper_bound=-log_productivity_lower_bound
+        
+        ! Discretizing the productivity grid
+        do log_productivity_index=1,log_productivity_grid_size
+        
+        	! Sets the grid points
+                log_productivity_grid(log_productivity_index)=log_productivity_lower_bound+&
+                    ((log_productivity_upper_bound-log_productivity_lower_bound)/(log_productivity_grid_size-1))*&
+                    (log_productivity_index-1)
+        
+        end do
+        
+        ! Constructcs the midpoints
+        do log_productivity_index=1,log_productivity_grid_size-1
+        
+                log_productivity_grid_mid_point(log_productivity_index)=&
+                    (log_productivity_grid(log_productivity_index+1)+log_productivity_grid(log_productivity_index))/2
+        
+        end do
+        
+        ! Computes the transmission probabilities from parent to child
+        do log_productivity_index=1,log_productivity_grid_size
+        
+           do future_log_productivity_index=2,log_productivity_grid_size-1
+            
+           	cut_off_1=(log_productivity_grid_mid_point(future_log_productivity_index)-&
+                    persistency_log_productivity*log_productivity_grid(log_productivity_index))/sd_log_productivity
+                
+                cut_off_1_index=maxloc(normal_dist_cut_off_grid,1,mask=normal_dist_cut_off_grid<=cut_off_1)  
+                
+                cut_off_2=(log_productivity_grid_mid_point(future_log_productivity_index-1)-&
+                    persistency_log_productivity*log_productivity_grid(log_productivity_index))/sd_log_productivity
+                    
+                cut_off_2_index=maxloc(normal_dist_cut_off_grid,1,mask=normal_dist_cut_off_grid<=cut_off_2)
+                
+                ! Computes the probability of transitioning form state productivity_index to future_productivity_index
+                productivity_process(log_productivity_index,future_log_productivity_index)=&
+                    normal_dist_cdf(cut_off_1_index)-normal_dist_cdf(cut_off_2_index)
+                    
+           end do
+        
+        end do
+        
+        ! Obtains the transimission probabilities from parent to child from each state to first state and last state
+        do log_productivity_index=1,log_productivity_grid_size
+        
+        	cut_off_1=(log_productivity_grid_mid_point(1)-&
+                    persistency_log_productivity*log_productivity_grid(log_productivity_index))/sd_log_productivity
+        
+                cut_off_1_index=maxloc(normal_dist_cut_off_grid,1,mask=normal_dist_cut_off_grid<=cut_off_1)    
+        
+                cut_off_2=(log_productivity_grid_mid_point(log_productivity_grid_size-1)-&
+                    persistency_log_productivity*log_productivity_grid(log_productivity_index))/sd_log_productivity
+        
+                cut_off_2_index=maxloc(normal_dist_cut_off_grid,1,mask=normal_dist_cut_off_grid<=cut_off_2) 
+                
+                ! Computes the probability of transitioning from state productivity_index to 1
+                productivity_process(log_productivity_index,1)=normal_dist_cdf(cut_off_1_index)
+                
+                ! Computes the probability of transitioning from state productivity_index to state productivity_grid_size
+                productivity_process(log_productivity_index,log_productivity_grid_size)=1-normal_dist_cdf(cut_off_2_index)
+        
+        end do
+        
+        log_productivity_grid=log_productivity_grid+mean_log_productivity
+                
+        productivity_grid=exp(log_productivity_grid)
+                
+        do i=1,productivity_grid_size
+        
+        	write(*,*) "productivity_index", i, "=", productivity_grid(i)
+        
+        end do
+
+end subroutine
+tauchen_method.txt
+Displaying tauchen_method.txt.
