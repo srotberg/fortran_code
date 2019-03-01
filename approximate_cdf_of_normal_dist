@@ -1,0 +1,36 @@
+
+    ! This subroutine computes an approximation of the cdf of the normal dirstribution up at each location from -9 to 9
+    subroutine cdf_normal_dist()
+    
+        use Wealth_Tax_Global_Vars
+    
+        implicit none
+        
+        ! Sets the lowest location of the normal dist
+        normal_dist_cut_off_grid(1)=normal_dist_lower_bound
+        
+        ! Sets the highest location of the normal dist
+        normal_dist_cut_off_grid(normal_dist_grid_size)=normal_dist_upper_bound
+    
+        ! Sets the grid for location to evaluation the cdf of the normal dist
+        do normal_dist_index=2,normal_dist_grid_size-1
+        
+            normal_dist_cut_off_grid(normal_dist_index)=normal_dist_cut_off_grid(normal_dist_index-1)+&
+                (normal_dist_upper_bound-normal_dist_lower_bound)/(normal_dist_grid_size-1)
+        
+        end do
+        
+        ! Sets the initial location (-20) at the value of the cdf there
+        normal_dist_cdf(1)=0.000000
+        
+        do normal_dist_index=2,normal_dist_grid_size
+        
+            normal_dist_cdf(normal_dist_index)=normal_dist_cdf(normal_dist_index-1)+&
+                1/sqrt(2*pi)*exp(-(normal_dist_cut_off_grid(normal_dist_index)**2)/2)*&
+                (normal_dist_upper_bound-normal_dist_lower_bound)/(normal_dist_grid_size-1)
+        
+        end do
+            
+    end subroutine
+approximating_normal_cdf.txt
+Displaying approximating_normal_cdf.txt.
